@@ -1,0 +1,8 @@
+{
+  "name": "infinityfree-github-hourly-webservice",
+  "version": "1.0.0",
+  "private": true,
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "dependencies": { "basic-ftp": "^5.0.5", "express": "^4.21.2" }
+}
