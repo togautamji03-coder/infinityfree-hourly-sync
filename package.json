@@ -1,0 +1,1 @@
+{"name":"infinityfree-github-hourly-sync","version":"1.0.0","private":true,"main":"sync.js","scripts":{"start":"node sync.js"},"dependencies":{"basic-ftp":"^5.0.5"}}
