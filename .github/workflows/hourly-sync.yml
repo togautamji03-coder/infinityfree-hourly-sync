@@ -1,0 +1,29 @@
+name: Hourly InfinityFree to GitHub sync
+
+on:
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+
+jobs:
+  trigger-sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Trigger protected Render sync endpoint
+        env:
+          RENDER_SYNC_URL: ${{ secrets.RENDER_SYNC_URL }}
+          SYNC_SECRET: ${{ secrets.SYNC_SECRET }}
+        run: |
+          set -eu
+          if [ -z "$RENDER_SYNC_URL" ] || [ -z "$SYNC_SECRET" ]; then
+            echo "Missing RENDER_SYNC_URL or SYNC_SECRET GitHub Actions secret."
+            exit 1
+          fi
+          curl --fail-with-body --silent --show-error \
+            --retry 8 --retry-delay 10 --retry-all-errors \
+            --max-time 240 \
+            -X POST "${RENDER_SYNC_URL%/}/sync" \
+            -H "Authorization: Bearer ${SYNC_SECRET}" \
+            -H "Content-Type: application/json" \
+            --data '{}'
