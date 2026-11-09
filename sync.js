@@ -10,7 +10,7 @@ const OWNER = env.GITHUB_OWNER, REPO = env.GITHUB_REPO, BRANCH = env.GITHUB_BRAN
 const SUBPATH = (env.GITHUB_SUBPATH || "").replace(/^\/+|\/+$/g, "");
 const DELETE_REMOTE = String(env.DELETE_REMOTE_FILES || "false").toLowerCase() === "true";
 const MAX_BYTES = Number(env.MAX_FILE_BYTES || 25 * 1024 * 1024);
-const skipDirs = new Set([".git",".svn","node_modules",".cache","logs","tmp","temp"]);
+const skipDirs = new Set([".git",".svn","node_modules",".cache","logs","tmp","temp","admin-backups"]);
 const skipFiles = new Set([".env",".env.local",".env.production",".ftpquota","htdocs-github-sync.php","config.private.php"]);
 const skipParts = ["secret","password","credential","private-key","id_rsa"];
 const skipExt = new Set([".log",".bak",".swp",".tmp"]);
@@ -83,7 +83,17 @@ async function runSync() {
     let added=0, updated=0, unchanged=0, deleted=0;
     for (const f of files) {
       localSet.add(f.relativePath);
-      const content = await readFtpFile(client, f.remotePath);
+      let content;
+      try {
+        content = await readFtpFile(client, f.remotePath);
+      } catch (err) {
+        // FTP listings can become stale while the PHP admin panel creates/removes backups.
+        // Skip this file and continue syncing the remaining stable files.
+        console.warn("SKIP FTP file unavailable during download:", f.relativePath,
+          err && err.message ? err.message : err);
+        localSet.delete(f.relativePath);
+        continue;
+      }
       const blob = await gh("/git/blobs", { method:"POST", headers:{"Content-Type":"application/json"},
         body: JSON.stringify({ content: content.toString("base64"), encoding:"base64" }) });
       const old = remote.get(f.relativePath);
@@ -101,7 +111,7 @@ async function runSync() {
       body:JSON.stringify({ base_tree:parent.tree.sha, tree:entries }) });
     const now = new Date().toISOString();
     const commit = await gh("/git/commits", { method:"POST", headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({ message:`Hourly InfinityFree sync ${now}`, tree:newTree.sha, parents:[parentSha],
+      body:JSON.stringify({ message:`Admin Update Website Sync ${now}`, tree:newTree.sha, parents:[parentSha],
         author:{name:env.COMMIT_AUTHOR_NAME || "Hourly Website Sync", email:env.COMMIT_AUTHOR_EMAIL || "hourly-sync@users.noreply.github.com", date:now} }) });
     await gh(`/git/refs/heads/${encodeURIComponent(BRANCH)}`, { method:"PATCH", headers:{"Content-Type":"application/json"},
       body:JSON.stringify({sha:commit.sha, force:false}) });
