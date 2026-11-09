@@ -37,5 +37,26 @@ app.post("/sync", async (req, res) => {
   }
 });
 
+// Admin-panel trigger: acknowledge immediately, then sync in the background.
+app.post("/trigger", (req, res) => {
+  if (!authorized(req)) return res.status(401).json({ error: "Unauthorized" });
+  if (running) return res.status(409).json({ error: "Sync already running" });
+
+  running = true;
+  console.log("Authenticated admin update queued sync:", new Date().toISOString());
+  res.status(202).json({ ok: true, queued: true });
+
+  setImmediate(async () => {
+    try {
+      const result = await runSync();
+      console.log("BACKGROUND SYNC COMPLETE:", JSON.stringify(result));
+    } catch (err) {
+      console.error("BACKGROUND SYNC FAILED:", err && err.stack ? err.stack : err);
+    } finally {
+      running = false;
+    }
+  });
+});
+
 const port = Number(process.env.PORT || 10000);
 app.listen(port, "0.0.0.0", () => console.log(`Sync web service listening on ${port}`));
